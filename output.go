@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/So-Sahari/go-bedrock/models"
-
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime"
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime/types"
+
+	"github.com/So-Sahari/go-bedrock/models"
 )
 
 func (m *AWSModelConfig) processStreamingOutput(output *bedrockruntime.InvokeModelWithResponseStreamOutput, handler StreamingOutputHandler) (string, error) {
@@ -21,15 +21,16 @@ func (m *AWSModelConfig) processStreamingOutput(output *bedrockruntime.InvokeMod
 		case *types.ResponseStreamMemberChunk:
 			// nested switch case for stream outputs. ugh
 			switch {
-			case strings.Contains(m.ModelID, "sonnet"):
-				var resp models.ClaudeMessagesOutput
-				if err := json.NewDecoder(bytes.NewReader(v.Value.Bytes)).Decode(&resp); err != nil {
+			case strings.Contains(m.ModelID, "sonnet"), strings.Contains(m.ModelID, "haiku"):
+				var pr PartialResponse
+				err := json.NewDecoder(bytes.NewReader(v.Value.Bytes)).Decode(&pr)
+				if err != nil {
 					return combinedResult, err
 				}
 
-				if resp.Delta.Type == "text_delta" {
-					handler(context.Background(), []byte(resp.Delta.Text))
-					combinedResult += resp.Delta.Text
+				if pr.Type == partialResponseTypeContentBlockDelta {
+					handler(context.Background(), []byte(pr.Delta.Text))
+					combinedResult += pr.Delta.Text
 				}
 			case strings.Contains(m.ModelID, "anthropic"):
 				var resp models.ClaudeModelOutputs
